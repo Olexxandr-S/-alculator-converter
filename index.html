@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calc & Currency — НБУ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0F1117;
+      --surface: #161B26;
+      --border:  rgba(255,255,255,0.08);
+      --accent:  #00D4AA;
+      --accent2: #0099FF;
+      --text:    #F0F4FF;
+      --muted:   rgba(240,244,255,0.45);
+      --btn-op:  rgba(0,212,170,0.12);
+      --btn-num: rgba(255,255,255,0.07);
+      --btn-eq:  linear-gradient(135deg,#00D4AA,#0099FF);
+      --danger:  #FF6B6B;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .app { width: 360px; padding: 20px; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 18px;
+    }
+    .tab {
+      flex: 1; padding: 9px 0; border: none;
+      background: transparent; color: var(--muted);
+      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+      border-radius: 10px; cursor: pointer;
+      transition: all .22s ease; letter-spacing: .01em;
+    }
+    .tab.active {
+      background: rgba(0,212,170,.13);
+      color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(0,212,170,.25);
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+
+    /* ── Calculator ── */
+    .display {
+      padding: 20px 20px 14px;
+      background: rgba(0,0,0,.2);
+      border-bottom: 1px solid var(--border);
+      text-align: right; min-height: 100px;
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    .display-expr { font-size: 13px; color: var(--muted); min-height: 18px; margin-bottom: 4px; word-break: break-all; }
+    .display-value { font-size: 38px; font-weight: 300; letter-spacing: -.02em; line-height: 1; word-break: break-all; transition: color .15s; }
+    .display-value.error { color: var(--danger); font-size: 22px; }
+
+    .grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); }
+    .btn {
+      background: var(--btn-num); border: none; color: var(--text);
+      font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 400;
+      padding: 0; height: 72px; cursor: pointer;
+      transition: background .12s, transform .08s;
+      display: flex; align-items: center; justify-content: center;
+      user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(.94); }
+    .btn.op  { background: var(--btn-op); color: var(--accent); font-weight: 500; }
+    .btn.op:hover { background: rgba(0,212,170,.2); }
+    .btn.fn  { background: rgba(255,255,255,.04); color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: .03em; }
+    .btn.fn:hover { background: rgba(255,255,255,.09); color: var(--text); }
+    .btn.eq  { background: var(--btn-eq); color: #fff; font-size: 22px; font-weight: 600; box-shadow: 0 4px 18px rgba(0,212,170,.3); }
+    .btn.eq:hover { filter: brightness(1.1); }
+    .btn.zero { grid-column: span 2; }
+    .btn.num:hover { background: rgba(255,255,255,.13); }
+
+    /* ── Currency ── */
+    .currency-body { padding: 18px; }
+
+    .rate-badge {
+      text-align: center; font-size: 11px; color: var(--muted);
+      margin-bottom: 14px; letter-spacing: .04em; line-height: 1.5;
+    }
+    .rate-badge b { color: var(--accent); font-weight: 600; }
+
+    .fx-group {
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 12px 14px 10px;
+      transition: border-color .2s; margin-bottom: 8px;
+    }
+    .fx-group:focus-within { border-color: rgba(0,212,170,.4); }
+    .fx-label { font-size: 11px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 6px; }
+    .fx-inner { display: flex; align-items: center; gap: 10px; }
+
+    .fx-select {
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: 13px; font-weight: 600;
+      padding: 6px 24px 6px 8px; cursor: pointer; width: 80px;
+      outline: none; -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.3)'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+      flex-shrink: 0;
+    }
+    .fx-select:focus { border-color: var(--accent); }
+    .fx-select option { background: #1a2233; }
+
+    .fx-input {
+      flex: 1; background: transparent; border: none;
+      color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: 26px; font-weight: 300; outline: none;
+      width: 100%; min-width: 0; letter-spacing: -.01em; text-align: right;
+    }
+    .fx-input::placeholder { color: rgba(255,255,255,.18); }
+
+    .fx-preview {
+      flex: 1; font-size: 26px; font-weight: 300;
+      color: var(--muted); text-align: right;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .swap-row { display: flex; justify-content: center; margin: 4px 0; }
+    .swap-btn {
+      background: rgba(0,212,170,.1); border: 1px solid rgba(0,212,170,.25);
+      border-radius: 50%; width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all .2s; color: var(--accent);
+    }
+    .swap-btn:hover { background: rgba(0,212,170,.22); transform: rotate(180deg); }
+
+    .result-box {
+      margin-top: 12px;
+      background: rgba(0,212,170,.06);
+      border: 1px solid rgba(0,212,170,.2);
+      border-radius: 14px; padding: 14px; text-align: center;
+    }
+    .result-label { font-size: 11px; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+    .result-value { font-size: 30px; font-weight: 300; letter-spacing: -.02em; }
+    .result-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    .convert-btn {
+      width: 100%; margin-top: 12px; padding: 13px;
+      background: var(--btn-eq); border: none; border-radius: 12px;
+      color: #fff; font-family: 'Inter', sans-serif;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      letter-spacing: .02em; transition: filter .15s, transform .08s;
+    }
+    .convert-btn:hover { filter: brightness(1.1); }
+    .convert-btn:active { transform: scale(.98); }
+    .convert-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .loading-row { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; color: var(--muted); font-size: 13px; }
+    .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .err-msg { color: var(--danger); font-size: 12px; text-align: center; padding: 6px 0; }
+
+    @media (max-width:380px) {
+      .app { width: 100%; padding: 10px; }
+      .btn { height: 62px; font-size: 15px; }
+      .display-value { font-size: 32px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('calc')">🧮 Калькулятор</button>
+    <button class="tab"        onclick="switchTab('fx')">💱 Валюти</button>
+  </div>
+
+  <div class="card">
+
+    <!-- ═══ CALCULATOR ═══ -->
+    <div id="calc-panel">
+      <div class="display">
+        <div class="display-expr" id="expr"></div>
+        <div class="display-value" id="disp">0</div>
+      </div>
+      <div class="grid">
+        <button class="btn fn"  onclick="clearAll()">AC</button>
+        <button class="btn fn"  onclick="toggleSign()">+/−</button>
+        <button class="btn fn"  onclick="percent()">%</button>
+        <button class="btn op"  onclick="op('/')">÷</button>
+        <button class="btn num" onclick="dig(7)">7</button>
+        <button class="btn num" onclick="dig(8)">8</button>
+        <button class="btn num" onclick="dig(9)">9</button>
+        <button class="btn op"  onclick="op('*')">×</button>
+        <button class="btn num" onclick="dig(4)">4</button>
+        <button class="btn num" onclick="dig(5)">5</button>
+        <button class="btn num" onclick="dig(6)">6</button>
+        <button class="btn op"  onclick="op('-')">−</button>
+        <button class="btn num" onclick="dig(1)">1</button>
+        <button class="btn num" onclick="dig(2)">2</button>
+        <button class="btn num" onclick="dig(3)">3</button>
+        <button class="btn op"  onclick="op('+')">+</button>
+        <button class="btn num zero" onclick="dig(0)">0</button>
+        <button class="btn num" onclick="dot()">.</button>
+        <button class="btn eq"  onclick="calc()">=</button>
+      </div>
+    </div>
+
+    <!-- ═══ CURRENCY ═══ -->
+    <div id="fx-panel" style="display:none">
+      <div class="currency-body">
+
+        <div class="rate-badge" id="rate-info">Офіційний курс НБУ</div>
+
+        <!-- FROM -->
+        <div class="fx-group">
+          <div class="fx-label">Сума</div>
+          <div class="fx-inner">
+            <select class="fx-select" id="from-cur" onchange="onCurChange()"></select>
+            <input  class="fx-input"  id="fx-input" type="number" placeholder="100" value="100" oninput="clearResult()" />
+          </div>
+        </div>
+
+        <!-- SWAP -->
+        <div class="swap-row">
+          <button class="swap-btn" onclick="swapCurrencies()" title="Поміняти">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 4.5L6 1v2.5H12M12 9.5L8 13v-2.5H2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- TO -->
+        <div class="fx-group">
+          <div class="fx-label">У валюту</div>
+          <div class="fx-inner">
+            <select class="fx-select" id="to-cur" onchange="clearResult()"></select>
+            <div class="fx-preview" id="to-preview">—</div>
+          </div>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loading-row" class="loading-row" style="display:none">
+          <span class="spinner"></span> Завантаження курсу НБУ…
+        </div>
+        <div id="err-msg" class="err-msg" style="display:none"></div>
+
+        <!-- Result -->
+        <div class="result-box" id="result-box" style="display:none">
+          <div class="result-label">Результат</div>
+          <div class="result-value" id="result-val">—</div>
+          <div class="result-sub"  id="result-sub"></div>
+        </div>
+
+        <button class="convert-btn" id="conv-btn" onclick="convertNow()">Конвертувати</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════
+   TAB SWITCH
+═══════════════════════════════════ */
+function switchTab(mode) {
+  document.getElementById('calc-panel').style.display = mode === 'calc' ? '' : 'none';
+  document.getElementById('fx-panel').style.display   = mode === 'fx'   ? '' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) =>
+    t.classList.toggle('active', (mode==='calc'&&i===0)||(mode==='fx'&&i===1))
+  );
+  if (mode === 'fx' && !nbuRates) loadRates();
+}
+
+/* ═══════════════════════════════════
+   CALCULATOR
+═══════════════════════════════════ */
+let current='0', prev='', operator=null, justCalc=false;
+
+function updateDisp() {
+  const el = document.getElementById('disp');
+  let v = current;
+  if (v.replace('-','').replace('.','').length > 12)
+    v = parseFloat(v).toPrecision(8).replace(/\.?0+$/,'');
+  el.textContent = v;
+  el.className = 'display-value';
+}
+function dig(n) {
+  if (justCalc) { current=String(n); justCalc=false; }
+  else current = current==='0' ? String(n) : current+n;
+  updateDisp();
+}
+function dot() {
+  if (justCalc) { current='0.'; justCalc=false; updateDisp(); return; }
+  if (!current.includes('.')) current += '.';
+  updateDisp();
+}
+function op(o) {
+  if (operator && !justCalc) calcCore(true);
+  prev=current; operator=o; justCalc=true;
+  const s={'+':'+','-':'−','*':'×','/':'÷'}[o];
+  document.getElementById('expr').textContent = prev+' '+s;
+}
+function calcCore(chain=false) {
+  if (!operator||prev==='') return;
+  const a=parseFloat(prev), b=parseFloat(current);
+  let r;
+  if (operator==='+') r=a+b;
+  else if (operator==='-') r=a-b;
+  else if (operator==='*') r=a*b;
+  else if (operator==='/') {
+    if (b===0) { showErr('Ділення на 0'); operator=null; return; }
+    r=a/b;
+  }
+  const s={'+':'+','-':'−','*':'×','/':'÷'}[operator];
+  if (!chain) document.getElementById('expr').textContent=prev+' '+s+' '+current+' =';
+  current=String(parseFloat(r.toFixed(10)));
+  if (!chain) operator=null;
+  justCalc=true; updateDisp();
+}
+function calc() { calcCore(false); }
+function showErr(msg) {
+  const el=document.getElementById('disp');
+  el.textContent=msg; el.className='display-value error';
+  current='0'; justCalc=false; operator=null;
+  setTimeout(()=>{ updateDisp(); document.getElementById('expr').textContent=''; },1800);
+}
+function clearAll() {
+  current='0'; prev=''; operator=null; justCalc=false;
+  document.getElementById('expr').textContent=''; updateDisp();
+}
+function toggleSign() { current=String(parseFloat(current)*-1); updateDisp(); }
+function percent()    { current=String(parseFloat(current)/100); updateDisp(); }
+
+document.addEventListener('keydown', e => {
+  if (document.getElementById('fx-panel').style.display!=='none') return;
+  if (e.key>='0'&&e.key<='9') dig(parseInt(e.key));
+  else if (e.key==='.') dot();
+  else if (e.key==='+') op('+');
+  else if (e.key==='-') op('-');
+  else if (e.key==='*') op('*');
+  else if (e.key==='/') { e.preventDefault(); op('/'); }
+  else if (e.key==='Enter'||e.key==='=') calc();
+  else if (e.key==='Backspace') { current=current.length>1?current.slice(0,-1):'0'; updateDisp(); }
+  else if (e.key==='Escape') clearAll();
+});
+
+/* ═══════════════════════════════════
+   CURRENCY — НБУ API
+═══════════════════════════════════ */
+// API: https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json
+// Повертає масив: [{r030, txt, rate, cc, exchangedate}, ...]
+// rate = скільки UAH за 1 одиницю цієї валюти
+
+const NBU_API = 'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json';
+
+let nbuRates   = null;   // { cc: rate_in_UAH }
+let nbuDate    = '';
+let nbuLoading = false;
+
+// Пріоритетні валюти — будуть першими в списку
+const PRIORITY = ['UAH','USD','EUR','GBP','PLN','CHF','CZK','HUF'];
+
+async function loadRates() {
+  if (nbuLoading) return;
+  nbuLoading = true;
+  setLoading(true); setError('');
+
+  try {
+    const res  = await fetch(NBU_API);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    nbuRates = { UAH: 1 };          // UAH = базова валюта (1 UAH = 1 UAH)
+    data.forEach(item => {
+      nbuRates[item.cc] = item.rate; // rate = UAH за 1 одиницю
+    });
+    nbuDate = data[0]?.exchangedate || '';
+
+    populateSelects(data);
+    updateBadge();
+  } catch(err) {
+    setError('Не вдалося завантажити курс НБУ. Перевірте з\'єднання.');
+  } finally {
+    nbuLoading = false;
+    setLoading(false);
+  }
+}
+
+function populateSelects(data) {
+  const f = document.getElementById('from-cur');
+  const t = document.getElementById('to-cur');
+  f.innerHTML = ''; t.innerHTML = '';
+
+  // Збудуємо впорядкований список: пріоритетні + решта за алфавітом
+  const allCodes = ['UAH', ...data.map(d => d.cc)];
+  const priority = PRIORITY.filter(c => allCodes.includes(c));
+  const rest     = allCodes.filter(c => !PRIORITY.includes(c)).sort();
+  const ordered  = [...priority, ...rest.filter(c => !priority.includes(c))];
+
+  // Мапа cc -> повна назва
+  const names = { UAH: 'Українська гривня' };
+  data.forEach(d => { names[d.cc] = d.txt; });
+
+  ordered.forEach(cc => {
+    const label = cc + (names[cc] ? ' – ' + names[cc].slice(0,22) : '');
+    f.add(new Option(cc, cc));
+    t.add(new Option(cc, cc));
+    // Додати title для підказки
+    f.options[f.options.length-1].title = names[cc] || cc;
+    t.options[t.options.length-1].title = names[cc] || cc;
+  });
+
+  f.value = 'USD';
+  t.value = 'UAH';
+}
+
+function updateBadge() {
+  const el = document.getElementById('rate-info');
+  if (nbuDate) {
+    el.innerHTML = `Офіційний курс <b>НБУ</b> на ${nbuDate}`;
+  } else {
+    el.innerHTML = 'Офіційний курс <b>НБУ</b>';
+  }
+}
+
+function setLoading(on) {
+  document.getElementById('loading-row').style.display = on ? 'flex' : 'none';
+  document.getElementById('conv-btn').disabled = on;
+}
+function setError(msg) {
+  const el = document.getElementById('err-msg');
+  el.textContent = msg;
+  el.style.display = msg ? '' : 'none';
+}
+
+function clearResult() {
+  document.getElementById('result-box').style.display = 'none';
+  document.getElementById('to-preview').textContent   = '—';
+  setError('');
+}
+
+function onCurChange() {
+  nbuRates = null;   // скидаємо кеш при зміні (незалежно від валюти)
+  clearResult();
+  loadRates();
+}
+
+function swapCurrencies() {
+  const f = document.getElementById('from-cur');
+  const t = document.getElementById('to-cur');
+  [f.value, t.value] = [t.value, f.value];
+  clearResult();
+}
+
+function convertNow() {
+  if (!nbuRates) { loadRates(); return; }
+
+  const amount = parseFloat(document.getElementById('fx-input').value);
+  const from   = document.getElementById('from-cur').value;
+  const to     = document.getElementById('to-cur').value;
+
+  if (isNaN(amount) || amount === 0) {
+    document.getElementById('fx-input').focus();
+    return;
+  }
+  if (!nbuRates[from]) { setError(`Валюта ${from} відсутня в даних НБУ`); return; }
+  if (!nbuRates[to])   { setError(`Валюта ${to} відсутня в даних НБУ`);   return; }
+
+  // Конвертація через UAH як проміжну
+  const amountInUAH = amount * nbuRates[from];
+  const result      = amountInUAH / nbuRates[to];
+  const rate        = nbuRates[from] / nbuRates[to];
+
+  const fmt = (n, cur) => {
+    try {
+      return new Intl.NumberFormat('uk-UA', {
+        style: 'currency', currency: cur,
+        minimumFractionDigits: 2, maximumFractionDigits: 4
+      }).format(n);
+    } catch { return n.toFixed(4) + ' ' + cur; }
+  };
+
+  document.getElementById('result-val').textContent = fmt(result, to);
+  document.getElementById('result-sub').textContent =
+    `1 ${from} = ${rate.toFixed(4)} ${to}   •   курс НБУ`;
+  document.getElementById('result-box').style.display = '';
+  document.getElementById('to-preview').textContent   = result.toFixed(2);
+}
+
+// Завантажуємо курси одразу при відкритті валютної вкладки
+// (якщо користувач одразу на ній)
+window.addEventListener('load', () => {
+  // Додаємо UAH до порожніх селектів як заглушку поки не завантажилось
+  ['from-cur','to-cur'].forEach(id => {
+    const s = document.getElementById(id);
+    if (!s.options.length) s.add(new Option('UAH','UAH'));
+  });
+});
+</script>
+</body>
+</html>

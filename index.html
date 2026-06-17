@@ -181,10 +181,64 @@
 
     .err-msg { color: var(--danger); font-size: 12px; text-align: center; padding: 6px 0; }
 
+    /* ── Rates ticker ── */
+    .rates-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-top: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0;
+      overflow: hidden;
+      height: 36px;
+    }
+    .rate-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 14px;
+      height: 100%;
+      flex: 1;
+      justify-content: center;
+      border-right: 1px solid var(--border);
+      transition: background .15s;
+      cursor: default;
+    }
+    .rate-pill:last-child { border-right: none; }
+    .rate-pill:hover { background: rgba(255,255,255,.04); }
+    .rate-pair {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+    .rate-val {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      letter-spacing: -.01em;
+    }
+    .rate-val.loading {
+      width: 36px;
+      height: 10px;
+      background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.06) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
     @media (max-width:380px) {
       .app { width: 100%; padding: 10px; }
       .btn { height: 62px; font-size: 15px; }
       .display-value { font-size: 32px; }
+      .rate-pair { display: none; }
+      .rate-pill { padding: 0 8px; }
     }
   </style>
 </head>
@@ -277,6 +331,23 @@
     </div>
 
   </div>
+
+  <!-- ── Rates ticker ── -->
+  <div class="rates-bar">
+    <div class="rate-pill" title="Долар США до гривні (НБУ)">
+      <span class="rate-pair">USD/UAH</span>
+      <span class="rate-val loading" id="tick-usd-uah"></span>
+    </div>
+    <div class="rate-pill" title="Євро до гривні (НБУ)">
+      <span class="rate-pair">EUR/UAH</span>
+      <span class="rate-val loading" id="tick-eur-uah"></span>
+    </div>
+    <div class="rate-pill" title="Долар до євро (НБУ)">
+      <span class="rate-pair">USD/EUR</span>
+      <span class="rate-val loading" id="tick-usd-eur"></span>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -516,7 +587,52 @@ window.addEventListener('load', () => {
     const s = document.getElementById(id);
     if (!s.options.length) s.add(new Option('UAH','UAH'));
   });
+  // Тікер курсів — завантажується одразу завжди
+  loadTicker();
 });
+
+/* ═══════════════════════════════════
+   RATES TICKER
+═══════════════════════════════════ */
+async function loadTicker() {
+  try {
+    const res  = await fetch(NBU_API);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+
+    const map = {};
+    data.forEach(d => { map[d.cc] = d.rate; }); // rate = UAH за 1 одиницю
+
+    const usdUah = map['USD'];
+    const eurUah = map['EUR'];
+    const usdEur = usdUah && eurUah ? (usdUah / eurUah) : null;
+
+    function setTick(id, val, decimals = 2) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('loading');
+      el.textContent = val != null ? val.toFixed(decimals) : '—';
+    }
+
+    setTick('tick-usd-uah', usdUah);
+    setTick('tick-eur-uah', eurUah);
+    setTick('tick-usd-eur', usdEur, 4);
+
+    // Якщо конвертор ще не завантажував — заповнюємо nbuRates з тікера
+    // щоб не було зайвого запиту при першому відкритті вкладки
+    if (!nbuRates) {
+      nbuRates = { UAH: 1 };
+      data.forEach(d => { nbuRates[d.cc] = d.rate; });
+      nbuDate = data[0]?.exchangedate || '';
+    }
+
+  } catch {
+    ['tick-usd-uah','tick-eur-uah','tick-usd-eur'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.remove('loading'); el.textContent = '—'; }
+    });
+  }
+}
 </script>
 </body>
 </html>
